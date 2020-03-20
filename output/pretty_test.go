@@ -129,7 +129,7 @@ func TestPrettyPrinter_PrintBody(t *testing.T) {
 		`  ],`,
 		`  "zzz": "hello ⚡",`, // unicode escapes should be converted to the characters they represent
 		`  "🍣": null`,
-		"}",
+		"}\n",
 	}, "\n")
 	if buffer.String() != expected {
 		t.Errorf("unexpected output: expected=\n%s\nactual=\n%s\n", expected, buffer.String())

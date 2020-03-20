@@ -49,7 +49,7 @@ var defaultHeaderPalette = HeaderPalette{
 	Proto:               aurora.BlueFg,
 	SuccessfulStatus:    aurora.GreenFg | aurora.BoldFm,
 	NonSuccessfulStatus: aurora.YellowFg | aurora.BoldFm,
-	FieldName:           aurora.WhiteFg,
+	FieldName:           aurora.WhiteFg | aurora.BoldFm | aurora.BoldFm,
 	FieldValue:          aurora.CyanFg,
 	FieldSeparator:      aurora.WhiteFg,
 }
@@ -127,7 +127,7 @@ func isXML(contentType string) bool {
 }
 
 func (p *PrettyPrinter) PrintBody(body io.Reader, contentType string) error {
-	l := lexers.MatchMimeType(contentType)
+	l := lexers.MatchMimeType(cleanContentType(contentType))
 	if l == nil {
 		l = lexers.Fallback
 	}
@@ -165,7 +165,7 @@ func (p *PrettyPrinter) PrintBody(body io.Reader, contentType string) error {
 		if err != nil {
 			return fmt.Errorf("re-encoding json: %w", err)
 		}
-		source = string(bb)
+		source = string(bb) + "\n"
 	} else {
 		bb, err := ioutil.ReadAll(body)
 		if err != nil {
