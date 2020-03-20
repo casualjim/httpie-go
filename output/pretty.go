@@ -6,12 +6,16 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"reflect"
+	"os"
 	"sort"
 	"strings"
 
+	"github.com/alecthomas/chroma"
+	"github.com/alecthomas/chroma/formatters"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/styles"
+	"github.com/go-xmlfmt/xmlfmt"
 	"github.com/logrusorgru/aurora"
-	"github.com/pkg/errors"
 )
 
 type PrettyPrinter struct {
@@ -19,7 +23,6 @@ type PrettyPrinter struct {
 	plain         Printer
 	aurora        aurora.Aurora
 	headerPalette *HeaderPalette
-	jsonPalette   *JSONPalette
 	indentWidth   int
 }
 
@@ -50,38 +53,19 @@ var defaultHeaderPalette = HeaderPalette{
 	FieldSeparator:      aurora.WhiteFg,
 }
 
-type JSONPalette struct {
-	Key       aurora.Color
-	String    aurora.Color
-	Number    aurora.Color
-	Boolean   aurora.Color
-	Null      aurora.Color
-	Delimiter aurora.Color
-}
-
-var defaultJSONPalette = JSONPalette{
-	Key:       aurora.BlueFg,
-	String:    aurora.YellowFg,
-	Number:    aurora.CyanFg,
-	Boolean:   aurora.RedFg | aurora.BoldFm,
-	Null:      aurora.RedFg | aurora.BoldFm,
-	Delimiter: aurora.WhiteFg,
-}
-
 func NewPrettyPrinter(config PrettyPrinterConfig) Printer {
 	return &PrettyPrinter{
 		writer:        config.Writer,
 		plain:         NewPlainPrinter(config.Writer),
 		aurora:        aurora.NewAurora(config.EnableColor),
 		headerPalette: &defaultHeaderPalette,
-		jsonPalette:   &defaultJSONPalette,
 		indentWidth:   4,
 	}
 }
 
 func (p *PrettyPrinter) PrintStatusLine(resp *http.Response) error {
 	var statusColor aurora.Color
-	if 200 <= resp.StatusCode && resp.StatusCode < 300 {
+	if resp.StatusCode/100 == 2 {
 		statusColor = p.headerPalette.SuccessfulStatus
 	} else {
 		statusColor = p.headerPalette.NonSuccessfulStatus
@@ -122,149 +106,74 @@ func (p *PrettyPrinter) PrintHeader(header http.Header) error {
 	return nil
 }
 
-func isJSON(contentType string) bool {
+func cleanContentType(contentType string) string {
 	contentType = strings.TrimSpace(contentType)
 
 	semicolon := strings.Index(contentType, ";")
 	if semicolon != -1 {
 		contentType = contentType[:semicolon]
 	}
+	return contentType
+}
 
-	return contentType == "application/json"
+func isJSON(contentType string) bool {
+	return cleanContentType(contentType) == "application/json"
+}
+
+func isXML(contentType string) bool {
+	return cleanContentType(contentType) == "application/xml"
 }
 
 func (p *PrettyPrinter) PrintBody(body io.Reader, contentType string) error {
-	// Fallback to PlainPrinter when the body is not JSON
-	if !isJSON(contentType) {
-		return p.plain.PrintBody(body, contentType)
+	l := lexers.MatchMimeType(contentType)
+	if l == nil {
+		l = lexers.Fallback
+	}
+	l = chroma.Coalesce(l)
+
+	// Determine formatter.
+	f := formatters.TTY8
+	if os.Getenv("TERM") == "xterm-256color" {
+		f = formatters.TTY256
+	}
+	if os.Getenv("COLORTERM") == "truecolor" {
+		f = formatters.TTY16m
 	}
 
-	content, err := ioutil.ReadAll(body)
+	// Determine style.
+	s := styles.Dracula
+	if os.Getenv("HT_THEME") != "" {
+		ss := styles.Get(os.Getenv("HT_THEME"))
+		if ss != nil {
+			s = ss
+		}
+	}
+
+	var source string
+	if isJSON(contentType) {
+		var data interface{}
+		if err := json.NewDecoder(body).Decode(&data); err != nil {
+			return fmt.Errorf("decoding json: %w", err)
+		}
+		bb, err := json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			return fmt.Errorf("re-encoding json: %w", err)
+		}
+		source = string(bb)
+	} else {
+		bb, err := ioutil.ReadAll(body)
+		if err != nil {
+			return fmt.Errorf("reading body: %w", err)
+		}
+		source = string(bb)
+		if isXML(contentType) {
+			source = xmlfmt.FormatXML(source, "", "  ")
+		}
+	}
+
+	it, err := l.Tokenise(nil, source)
 	if err != nil {
-		return errors.Wrap(err, "reading body")
-	}
-
-	var v interface{}
-	if err := json.Unmarshal(content, &v); err != nil {
-		// Failed to parse body as JSON. Print as-is.
-		p.writer.Write(content)
-		fmt.Fprintln(p.writer)
-		return nil
-	}
-	if err := p.printJSON(v, 0); err != nil {
 		return err
 	}
-
-	fmt.Fprintln(p.writer)
-	return nil
-}
-
-func (p *PrettyPrinter) printJSON(v interface{}, depth int) error {
-	if v == nil {
-		return p.printNull()
-	}
-	value := reflect.ValueOf(v)
-	switch value.Kind() {
-	case reflect.Bool:
-		return p.printBool(value)
-	case reflect.Float64:
-		return p.printNumber(value)
-	case reflect.String:
-		return p.printString(value)
-	case reflect.Slice:
-		return p.printArray(value, depth)
-	case reflect.Map:
-		return p.printMap(value, depth)
-	default:
-		return errors.Errorf("[BUG] unknown value in JSON: %+v", value)
-	}
-}
-
-func (p *PrettyPrinter) printNull() error {
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize("null", p.jsonPalette.Null))
-	return nil
-}
-
-func (p *PrettyPrinter) printBool(value reflect.Value) error {
-	var s string
-	if value.Bool() {
-		s = "true"
-	} else {
-		s = "false"
-	}
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize(s, p.jsonPalette.Boolean))
-	return nil
-}
-
-func (p *PrettyPrinter) printNumber(value reflect.Value) error {
-	fmt.Fprintf(p.writer, "%g", p.aurora.Colorize(value.Float(), p.jsonPalette.Number))
-	return nil
-}
-
-func (p *PrettyPrinter) printString(value reflect.Value) error {
-	s := value.String()
-	b, _ := json.Marshal(s)
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize(string(b), p.jsonPalette.String))
-	return nil
-}
-
-func (p *PrettyPrinter) printArray(value reflect.Value, depth int) error {
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize("[", p.jsonPalette.Delimiter))
-
-	n := value.Len()
-	for i := 0; i < n; i++ {
-		p.breakLine(depth + 1)
-
-		elem := value.Index(i)
-		if err := p.printJSON(elem.Interface(), depth+1); err != nil {
-			return err
-		}
-
-		if i != n-1 {
-			fmt.Fprintf(p.writer, "%s", p.aurora.Colorize(",", p.jsonPalette.Delimiter))
-		}
-	}
-
-	if n != 0 {
-		p.breakLine(depth)
-	}
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize("]", p.jsonPalette.Delimiter))
-	return nil
-}
-
-func (p *PrettyPrinter) printMap(value reflect.Value, depth int) error {
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize("{", p.jsonPalette.Delimiter))
-
-	keys := value.MapKeys()
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i].String() < keys[j].String()
-	})
-
-	for i, key := range keys {
-		p.breakLine(depth + 1)
-
-		encodedKey, _ := json.Marshal(key.String())
-		fmt.Fprintf(p.writer, "%s%s ",
-			p.aurora.Colorize(encodedKey, p.jsonPalette.Key),
-			p.aurora.Colorize(":", p.jsonPalette.Delimiter))
-
-		elem := value.MapIndex(key)
-		if err := p.printJSON(elem.Interface(), depth+1); err != nil {
-			return err
-		}
-
-		if i != len(keys)-1 {
-			fmt.Fprintf(p.writer, "%s", p.aurora.Colorize(",", p.jsonPalette.Delimiter))
-		}
-	}
-
-	if len(keys) != 0 {
-		p.breakLine(depth)
-	}
-	fmt.Fprintf(p.writer, "%s", p.aurora.Colorize("}", p.jsonPalette.Delimiter))
-	return nil
-}
-
-func (p *PrettyPrinter) breakLine(depth int) {
-	fmt.Fprintf(p.writer, "\n%s", strings.Repeat(" ", depth*p.indentWidth))
+	return f.Format(p.writer, s, it)
 }

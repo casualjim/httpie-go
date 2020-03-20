@@ -52,7 +52,8 @@ func BuildHTTPRequest(in *input.Input, options *Options) (*http.Request, error) 
 		if header.Get("Content-Type") != "" {
 			header.Set("Accept", header.Get("Content-Type"))
 		} else {
-			header.Set("Accept", "application/json;charset=utf-8;q=1.0,application/json;q=0.9,*/*;q=0.1")
+			header.Add("Accept", "application/json")
+			header.Add("Accept", "*/*")
 		}
 	}
 
