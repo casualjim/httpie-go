@@ -2,14 +2,13 @@ package input
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/url"
 	"regexp"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 var (

@@ -75,6 +75,7 @@ func TestBuildHTTPRequest(t *testing.T) {
 		"User-Agent":    []string{fmt.Sprintf("httpie-go/%s", version.Current())},
 		"Host":          []string{"example.com:8080"},
 		"Authorization": []string{"Basic YWxpY2U6b3BlbiBzZXNhbWU="},
+		"Accept":        []string{"application/json"},
 	}
 	if !reflect.DeepEqual(expectedHeader, actual.Header) {
 		t.Errorf("unexpected header: expected=%v, actual=%v", expectedHeader, actual.Header)

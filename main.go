@@ -97,7 +97,7 @@ func Exchange(in *input.Input, exchangeOptions *exchange.Options, outputOptions 
 	}
 	resp, err := httpClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("sending HTTP request: %w")
+		return fmt.Errorf("sending HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 

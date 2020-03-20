@@ -24,6 +24,7 @@ type PrettyPrinter struct {
 	aurora        aurora.Aurora
 	headerPalette *HeaderPalette
 	indentWidth   int
+	enableColor   bool
 }
 
 type PrettyPrinterConfig struct {
@@ -60,6 +61,7 @@ func NewPrettyPrinter(config PrettyPrinterConfig) Printer {
 		aurora:        aurora.NewAurora(config.EnableColor),
 		headerPalette: &defaultHeaderPalette,
 		indentWidth:   4,
+		enableColor:   config.EnableColor,
 	}
 }
 
@@ -147,6 +149,10 @@ func (p *PrettyPrinter) PrintBody(body io.Reader, contentType string) error {
 		if ss != nil {
 			s = ss
 		}
+	}
+	if !p.enableColor {
+		f = formatters.NoOp
+		s = styles.SwapOff
 	}
 
 	var source string
