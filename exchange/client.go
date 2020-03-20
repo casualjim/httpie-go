@@ -2,6 +2,8 @@ package exchange
 
 import (
 	"net/http"
+
+	"stash.corp.netflix.com/ps/metatron-go/mttls"
 )
 
 func BuildHTTPClient(options *Options) (*http.Client, error) {
@@ -13,9 +15,19 @@ func BuildHTTPClient(options *Options) (*http.Client, error) {
 		checkRedirect = nil
 	}
 
-	client := http.Client{
+	if options.AppName != "" {
+		cl, err := mttls.NewHTTPClient(options.AppName)
+		if err != nil {
+			return nil, err
+		}
+		cl.CheckRedirect = checkRedirect
+		cl.Timeout = options.Timeout
+
+		return cl, nil
+	}
+
+	return &http.Client{
 		CheckRedirect: checkRedirect,
 		Timeout:       options.Timeout,
-	}
-	return &client, nil
+	}, nil
 }
