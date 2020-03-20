@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 type PlainPrinter struct {
@@ -41,7 +39,7 @@ func (p *PlainPrinter) PrintHeader(header http.Header) error {
 func (p *PlainPrinter) PrintBody(body io.Reader, contentType string) error {
 	_, err := io.Copy(p.writer, body)
 	if err != nil {
-		return errors.Wrap(err, "printing body")
+		return fmt.Errorf("printing body: %w", err)
 	}
 	return nil
 }

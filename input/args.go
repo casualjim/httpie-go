@@ -2,6 +2,7 @@ package input
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -37,7 +38,7 @@ func (e *UsageError) Error() string {
 
 func newUsageError(message string) error {
 	u := UsageError(message)
-	return errors.WithStack(&u)
+	return &u
 }
 
 type state struct {
@@ -91,7 +92,7 @@ func ParseArgs(args []string, stdin io.Reader, options *Options) (*Input, error)
 		in.Body.BodyType = RawBody
 		in.Body.Raw, err = ioutil.ReadAll(stdin)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to read stdin")
+			return nil, fmt.Errorf("failed to read stdin: %w", err)
 		}
 		state.stdinConsumed = true
 	}
@@ -122,7 +123,7 @@ func determinePreferredBodyType(options *Options) (BodyType, error) {
 
 func parseMethod(s string) (Method, error) {
 	if !reMethod.MatchString(s) {
-		return emptyMethod, errors.Errorf("METHOD must consist of alphabets: %s", s)
+		return emptyMethod, fmt.Errorf("METHOD must consist of alphabets: %s", s)
 	}
 
 	method := Method(strings.ToUpper(s))
@@ -182,12 +183,12 @@ func parseItem(s string, stdin io.Reader, state *state, in *Input) error {
 			return err
 		}
 		if !json.Valid([]byte(field.Value)) {
-			return errors.Errorf("invalid JSON at '%s': %s", name, field.Value)
+			return fmt.Errorf("invalid JSON at '%s': %s", name, field.Value)
 		}
 		in.Body.RawJSONFields = append(in.Body.RawJSONFields, field)
 	case httpHeaderItem:
 		if !isValidHeaderFieldName(name) {
-			return errors.Errorf("invalid header field name: %s", name)
+			return fmt.Errorf("invalid header field name: %s", name)
 		}
 		field, err := parseField(name, value, stdin, state)
 		if err != nil {
@@ -211,7 +212,7 @@ func parseItem(s string, stdin io.Reader, state *state, in *Input) error {
 		}
 		in.Body.Files = append(in.Body.Files, field)
 	default:
-		return errors.Errorf("unknown request item: %s", s)
+		return fmt.Errorf("unknown request item: %s", s)
 	}
 	return nil
 }
@@ -248,7 +249,7 @@ func parseField(name, value string, stdin io.Reader, state *state) (Field, error
 		if value[1:] == "-" {
 			b, err := ioutil.ReadAll(stdin)
 			if err != nil {
-				return Field{}, errors.Wrapf(err, "reading stdin for '%s'", name)
+				return Field{}, fmt.Errorf("reading stdin for '%s': %w", name, err)
 			}
 			state.stdinConsumed = true
 			return Field{Name: name, Value: string(b), IsFile: false}, nil

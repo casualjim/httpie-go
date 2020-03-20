@@ -16,7 +16,6 @@ import (
 
 	"github.com/nojima/httpie-go/input"
 	"github.com/nojima/httpie-go/version"
-	"github.com/pkg/errors"
 )
 
 type bodyTuple struct {
@@ -77,7 +76,7 @@ func BuildHTTPRequest(in *input.Input, options *Options) (*http.Request, error) 
 func buildURL(in *input.Input) (*url.URL, error) {
 	q, err := url.ParseQuery(in.URL.RawQuery)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing query string")
+		return nil, fmt.Errorf("parsing query string: %w", err)
 	}
 	for _, field := range in.Parameters {
 		value, err := resolveFieldValue(field)
@@ -115,7 +114,7 @@ func buildHTTPBody(in *input.Input) (bodyTuple, error) {
 	case input.RawBody:
 		return buildRawBody(in)
 	default:
-		return bodyTuple{}, errors.Errorf("unknown body type: %v", in.Body.BodyType)
+		return bodyTuple{}, fmt.Errorf("unknown body type: %v", in.Body.BodyType)
 	}
 }
 
@@ -135,13 +134,13 @@ func buildJSONBody(in *input.Input) (bodyTuple, error) {
 		}
 		var v interface{}
 		if err := json.Unmarshal([]byte(value), &v); err != nil {
-			return bodyTuple{}, errors.Wrapf(err, "parsing JSON value of '%s'", field.Name)
+			return bodyTuple{}, fmt.Errorf("parsing JSON value of '%s': %w", field.Name, err)
 		}
 		obj[field.Name] = v
 	}
 	body, err := json.Marshal(obj)
 	if err != nil {
-		return bodyTuple{}, errors.Wrap(err, "marshaling JSON of HTTP body")
+		return bodyTuple{}, fmt.Errorf("marshaling JSON of HTTP body: %w", err)
 	}
 	return bodyTuple{
 		body: ioutil.NopCloser(bytes.NewReader(body)),
@@ -244,16 +243,16 @@ func buildFilePart(field input.Field, multipartWriter *multipart.Writer) error {
 	if field.IsFile {
 		file, err := os.Open(field.Value)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open '%s'", field.Value)
+			return fmt.Errorf("failed to open '%s': %w", field.Value, err)
 		}
 		defer file.Close()
 
 		if _, err := io.Copy(w, file); err != nil {
-			return errors.Wrapf(err, "failed to read from '%s'", field.Value)
+			return fmt.Errorf("failed to read from '%s': %w", field.Value, err)
 		}
 	} else {
 		if _, err := io.Copy(w, strings.NewReader(field.Value)); err != nil {
-			return errors.Wrap(err, "failed to write to multipart writer")
+			return fmt.Errorf("failed to write to multipart writer: %w", err)
 		}
 	}
 	return nil
@@ -312,7 +311,7 @@ func resolveFieldValue(field input.Field) (string, error) {
 	if field.IsFile {
 		data, err := ioutil.ReadFile(field.Value)
 		if err != nil {
-			return "", errors.Wrapf(err, "reading field value of '%s'", field.Name)
+			return "", fmt.Errorf("reading field value of '%s': %w", field.Name, err)
 		}
 		return string(data), nil
 	} else {

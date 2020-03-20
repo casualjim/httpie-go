@@ -7,7 +7,6 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -18,7 +17,7 @@ func askPassword() (string, error) {
 	} else {
 		tty, err := os.Open("/dev/tty")
 		if err != nil {
-			return "", errors.Wrap(err, "failed to allocate terminal")
+			return "", fmt.Errorf("failed to allocate terminal: %w", err)
 		}
 		defer tty.Close()
 		fd = int(tty.Fd())
@@ -27,7 +26,7 @@ func askPassword() (string, error) {
 	fmt.Fprintf(os.Stderr, "Password: ")
 	password, err := terminal.ReadPassword(fd)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read password from terminal")
+		return "", fmt.Errorf("failed to read password from terminal: %w", err)
 	}
 	fmt.Fprintln(os.Stderr)
 	return string(password), nil

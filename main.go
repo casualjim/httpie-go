@@ -3,6 +3,7 @@ package httpie
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -12,7 +13,6 @@ import (
 	"github.com/nojima/httpie-go/flags"
 	"github.com/nojima/httpie-go/input"
 	"github.com/nojima/httpie-go/output"
-	"github.com/pkg/errors"
 )
 
 func Main() error {
@@ -27,7 +27,8 @@ func Main() error {
 
 	// Parse positional arguments
 	in, err := input.ParseArgs(args, os.Stdin, &inputOptions)
-	if _, ok := errors.Cause(err).(*input.UsageError); ok {
+
+	if _, ok := errors.Unwrap(err).(*input.UsageError); ok {
 		usage.PrintUsage(os.Stderr)
 		return err
 	}
@@ -96,7 +97,7 @@ func Exchange(in *input.Input, exchangeOptions *exchange.Options, outputOptions 
 	}
 	resp, err := httpClient.Do(request)
 	if err != nil {
-		return errors.Wrap(err, "sending HTTP request")
+		return fmt.Errorf("sending HTTP request: %w")
 	}
 	defer resp.Body.Close()
 

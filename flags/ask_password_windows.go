@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -15,7 +14,7 @@ func askPassword() (string, error) {
 	fd := int(os.Stdin.Fd())
 	password, err := terminal.ReadPassword(fd)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read password from terminal")
+		return "", fmt.Errorf("failed to read password from terminal: %w", err)
 	}
 	fmt.Fprintln(os.Stderr)
 	return string(password), nil

@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"github.com/nojima/httpie-go/output"
 	"github.com/nojima/httpie-go/version"
 	"github.com/pborman/getopt"
-	"github.com/pkg/errors"
 )
 
 var reNumber = regexp.MustCompile(`^[0-9.]+$`)
@@ -179,7 +179,7 @@ func parsePrintFlag(
 			case 'b':
 				outputOptions.PrintResponseBody = true
 			default:
-				return errors.Errorf("invalid char in --print value (must be consist of HBhb): %c", c)
+				return fmt.Errorf("invalid char in --print value (must be consist of HBhb): %c", c)
 			}
 		}
 	}
@@ -203,7 +203,7 @@ func parsePretty(prettyFlag string, stdoutIsTerminal bool, outputOptions *output
 	case "colors":
 		return errors.New("--pretty=colors is not implemented")
 	default:
-		return errors.Errorf("unknown value of --pretty: %s", prettyFlag)
+		return fmt.Errorf("unknown value of --pretty: %s", prettyFlag)
 	}
 	return nil
 }
@@ -214,7 +214,7 @@ func parseDurationOrSeconds(timeout string) (time.Duration, error) {
 	}
 	d, err := time.ParseDuration(timeout)
 	if err != nil {
-		return time.Duration(0), errors.Errorf("Value of --timeout must be a number or duration string: %v", timeout)
+		return time.Duration(0), fmt.Errorf("Value of --timeout must be a number or duration string: %v", timeout)
 	}
 	return d, nil
 }
