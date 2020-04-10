@@ -6,7 +6,6 @@ type Options struct {
 	Timeout         time.Duration
 	FollowRedirects bool
 	Auth            AuthOptions
-	AppName         string
 }
 
 type AuthOptions struct {

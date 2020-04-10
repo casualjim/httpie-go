@@ -11,6 +11,12 @@ Responses are displayed with syntax highlighting.
 httpie-go is a clone of [httpie](https://httpie.org/).
 Since httpie-go is written in Go, it is a single binary and does not require a heavy runtime.
 
+## Theme
+
+To change the colorization theme you can specify an environment variable: HT_THEME
+
+You can pick any of these themes: https://xyproto.github.io/splash/docs/
+
 ## Examples
 
 This example sends a GET request to http://httpbin.org/get.
